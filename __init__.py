@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import re
 import time
 import os
 from ifaddr import get_adapters
@@ -31,7 +32,7 @@ def get_ifaces(ignore_list=None):
     Returns:
         (dict) with device names as keys and ip addresses as value.
     """
-    ignore_list = ignore_list or ['lo']
+    ignore_list = ignore_list or ['lo', 'docker0']  # jdp - ignore docker0, handle this better
     res = {}
     for iface in get_adapters():
         # ignore "lo" (the local loopback)
@@ -115,18 +116,19 @@ class IPSkill(MycroftSkill):
             return
 
         try:
-            scanoutput = check_output(["iwlist", "wlan0", "scan"])
+            scanoutput = check_output(["iwlist", "wlp3s0", "scan"])
 
-            for line in scanoutput.split():
-                line = line.decode("utf-8")
-                if line[:5] == "ESSID":
-                    ssid = line.split('"')[1]
+            for line in scanoutput.decode("utf-8").split("\n"):
+                stripped_line = line.strip()
+                if stripped_line.startswith("ESSID:"):
+                    ssid = stripped_line[6:]
+
         except CalledProcessError:
-            # Computer has no wlan0
+            # Computer has no wlp3s0, jdp changed from wlan0
             pass
         finally:
             if ssid:
-                self.speak(ssid)
+                self.speak_dialog("my ssid is", {'ssid': ssid})
             else:
                 self.speak_dialog("ethernet.connection")
 
